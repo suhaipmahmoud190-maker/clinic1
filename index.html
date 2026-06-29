@@ -16,7 +16,7 @@ body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:var(--bg);color:v
 
 /* LOGIN */
 .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--pri),var(--pri2));}
-.login-box{background:var(--card);border-radius:16px;padding:44px 38px;width:360px;box-shadow:0 12px 40px rgba(0,0,0,.2);}
+.login-box{background:var(--card);border-radius:16px;padding:30px 24px;width:100%;max-width:400px;box-shadow:0 12px 40px rgba(0,0,0,.2);}
 .login-box .logo{text-align:center;font-size:2.4em;margin-bottom:6px;}
 .login-box h2{text-align:center;color:var(--pri);font-size:1.3em;margin-bottom:28px;font-weight:700;}
 
@@ -126,6 +126,28 @@ tbody tr:hover td{background:#f8fbfc;}
 /* TOAST */
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a2332;color:#fff;padding:12px 24px;border-radius:8px;font-size:.9em;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;}
 #toast.show{opacity:1;}
+
+/* ========================================= */
+/* تحسينات للجوال (أقل من 480px) */
+/* ========================================= */
+@media (max-width: 480px) {
+  .login-box { padding: 24px 18px; }
+  .login-box h2 { font-size: 1.1em; }
+  .login-box .logo { font-size: 2em; }
+  .topbar { padding: 0 12px; height: 50px; }
+  .topbar-name { font-size: 0.9em; }
+  .role-badge { font-size: 0.65em; padding: 2px 10px; }
+  .wrap { padding: 12px 10px; }
+  .card { padding: 16px; }
+  .card-head h3 { font-size: 0.95em; }
+  .g2, .g3, .g4 { grid-template-columns: 1fr; gap: 8px; }
+  .tabs { gap: 4px; }
+  .tab { padding: 6px 10px; font-size: 0.75em; }
+  .btn { padding: 6px 12px; font-size: 0.8em; }
+  .btn-sm { padding: 4px 8px; font-size: 0.7em; }
+  table { font-size: 0.75em; }
+  th, td { padding: 6px 8px; }
+}
 </style>
 </head>
 <body>
