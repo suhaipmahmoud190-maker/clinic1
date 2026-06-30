@@ -127,9 +127,7 @@ tbody tr:hover td{background:#f8fbfc;}
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a2332;color:#fff;padding:12px 24px;border-radius:8px;font-size:.9em;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;}
 #toast.show{opacity:1;}
 
-/* ========================================= */
 /* تحسينات للجوال (أقل من 480px) */
-/* ========================================= */
 @media (max-width: 480px) {
   .login-box { padding: 24px 18px; }
   .login-box h2 { font-size: 1.1em; }
@@ -442,7 +440,6 @@ function drawAppts(){
     <thead><tr><th>المريض</th><th>التاريخ</th><th>الوقت</th><th>ملاحظة</th><th>بواسطة</th><th>الحالة</th>${canAct?'<th>إجراء</th>':''}</tr></thead>
     <tbody>
     ${list.map(a=>{
-      // ─── التعديل: منع فتح البطاقة إذا كانت الحالة "done" ───
       const patientLink = (a.patientId && a.status !== 'done')
         ? `<button class="btn btn-out btn-sm" onclick="openPatientFile('${a.patientId}')">📋 ${esc(a.patientName)}</button>`
         : `<strong>${esc(a.patientName)}</strong>`;
@@ -682,30 +679,40 @@ async function openPatientFile(pid){
   ` : ''}
 
   ${canP?`
-  <!-- دفعة مالية -->
+  <!-- ════════════════════════════════════════════════ -->
+  <!-- دفعة مالية (محدثة) -->
+  <!-- ════════════════════════════════════════════════ -->
   <div class="card">
     <div class="card-head"><h3>💳 إضافة دفعة مالية</h3></div>
     <div class="g3">
       <div>
         <label>نوع الدفع *</label>
-        <select id="pt" onchange="toggleInstall()">
+        <select id="pt">
           <option value="cash">💵 كاش</option>
           <option value="credit">📋 على الحساب</option>
           <option value="installment">📆 أقساط</option>
         </select>
       </div>
       <div><label>المبلغ المدفوع *</label><input id="pa" type="number" min="0" placeholder="0.00"></div>
-      <div id="totDiv" class="hidden"><label>إجمالي الفاتورة</label><input id="pt2" type="number" min="0" placeholder="0.00"></div>
+      <div><label>إجمالي الفاتورة (اختياري)</label><input id="pt2" type="number" min="0" placeholder="اتركه فارغاً = المدفوع"></div>
     </div>
     <div><label>البند / الوصف</label><input id="pn2" placeholder="مثال: كشفية، علاج جذر، تنظيف أسنان..."></div>
     <button id="addPayBtn" class="btn btn-s mt-8" onclick="addPay('${pid}','${esc(pat.name||'')}')">✅ تسجيل الدفعة</button>
   </div>
 
-  <!-- كشف حساب -->
+  <!-- ════════════════════════════════════════════════ -->
+  <!-- كشف حساب مع ملخص الرصيد -->
+  <!-- ════════════════════════════════════════════════ -->
   <div class="card">
     <div class="card-head">
       <h3>📊 كشف حساب المريض</h3>
       <button class="btn btn-w btn-sm" onclick="exportPatExcel('${pid}','${esc(pat.name||'')}')">📊 تصدير Excel</button>
+    </div>
+    <!-- ملخص الرصيد -->
+    <div id="balanceSummary" style="background:#f8fbfc;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;flex-wrap:wrap;gap:16px;justify-content:space-around;font-size:.95em;">
+      <div><strong>💵 إجمالي الفواتير:</strong> <span id="totalBills" style="color:var(--pri);">0</span></div>
+      <div><strong>💳 إجمالي المدفوع:</strong> <span id="totalPaid" style="color:var(--suc);">0</span></div>
+      <div><strong>⏳ الرصيد المتبقي:</strong> <span id="remainingBalance" style="color:var(--dan);font-weight:700;">0</span></div>
     </div>
     <div id="paysList"><div class="empty">جاري التحميل...</div></div>
   </div>
@@ -745,7 +752,9 @@ async function openPatientFile(pid){
     _unsubscribers.push(unsub1);
   }
 
-  // استماع للمدفوعات
+  // ═══════════════════════════════════════════════════
+  // استماع للمدفوعات (محدث مع ملخص الرصيد)
+  // ═══════════════════════════════════════════════════
   if(canP){
     const unsub2 = db.collection('payments').where('patientId','==',pid)
       .onSnapshot(snap=>{
@@ -753,7 +762,14 @@ async function openPatientFile(pid){
         list.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
         const el = document.getElementById('paysList');
         if(!el) return;
-        if(!list.length){ el.innerHTML='<div class="empty">لا توجد دفعات مسجلة بعد</div>'; return; }
+        if(!list.length){ 
+          el.innerHTML='<div class="empty">لا توجد دفعات مسجلة بعد</div>';
+          // تحديث الملخص بصفر
+          document.getElementById('totalBills').textContent = '0';
+          document.getElementById('totalPaid').textContent = '0';
+          document.getElementById('remainingBalance').textContent = '0';
+          return; 
+        }
         let tp=0, tb=0;
         const rows = list.map(p=>{
           const paid = Number(p.amountPaid)||0;
@@ -784,15 +800,46 @@ async function openPatientFile(pid){
           </tr>
           </tbody>
         </table></div>`;
+        // تحديث ملخص الرصيد
+        document.getElementById('totalBills').textContent = fmt(tb);
+        document.getElementById('totalPaid').textContent = fmt(tp);
+        document.getElementById('remainingBalance').textContent = fmt(tb - tp);
       }, err=> toast('خطأ في تحميل المدفوعات: '+err.message,'err'));
     _unsubscribers.push(unsub2);
   }
 }
 
+// ═══════════════════════════════════════════════════
+// دوال المدفوعات (محدثة)
+// ═══════════════════════════════════════════════════
+async function addPay(pid, patName){
+  const type = document.getElementById('pt').value;
+  const paid = Number(document.getElementById('pa').value)||0;
+  const totEl = document.getElementById('pt2');
+  // إذا كان حقل الإجمالي فارغاً أو 0، نجعل الإجمالي = المدفوع
+  let total = (totEl && totEl.value) ? Number(totEl.value) : paid;
+  // التأكد من أن الإجمالي لا يقل عن المدفوع
+  if (total < paid) total = paid;
+  const note = document.getElementById('pn2').value.trim();
+  if(!paid){ toast('أدخل المبلغ المدفوع','err'); return; }
+  setLoading('addPayBtn', true);
+  try{
+    await db.collection('payments').add({
+      patientId:pid, patientName:patName, payType:type,
+      amountPaid:paid, totalAmount:total,
+      date:today(), note, by:DNAME,
+      createdAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    document.getElementById('pa').value='';
+    document.getElementById('pn2').value='';
+    if(totEl) totEl.value='';
+    toast('✅ تم تسجيل الدفعة');
+  } catch(e){ toast('خطأ في الحفظ: '+e.message,'err'); }
+  setLoading('addPayBtn', false);
+}
+
 function toggleInstall(){
-  const t = (document.getElementById('pt')||{}).value;
-  const d = document.getElementById('totDiv');
-  if(d) d.classList.toggle('hidden', t!=='installment');
+  // لم تعد مستخدمة، لكن نتركها للتوافق
 }
 
 async function savePatInfo(pid){
@@ -827,29 +874,6 @@ async function addVisit(pid){
     toast('✅ تم حفظ الزيارة');
   } catch(e){ toast('خطأ في الحفظ: '+e.message,'err'); }
   setLoading('addVisitBtn', false);
-}
-
-async function addPay(pid, patName){
-  const type = document.getElementById('pt').value;
-  const paid = Number(document.getElementById('pa').value)||0;
-  const totEl = document.getElementById('pt2');
-  const total = (type==='installment'&&totEl) ? (Number(totEl.value)||paid) : paid;
-  const note = document.getElementById('pn2').value.trim();
-  if(!paid){ toast('أدخل المبلغ المدفوع','err'); return; }
-  setLoading('addPayBtn', true);
-  try{
-    await db.collection('payments').add({
-      patientId:pid, patientName:patName, payType:type,
-      amountPaid:paid, totalAmount:total,
-      date:today(), note, by:DNAME,
-      createdAt:firebase.firestore.FieldValue.serverTimestamp()
-    });
-    document.getElementById('pa').value='';
-    document.getElementById('pn2').value='';
-    if(totEl) totEl.value='';
-    toast('✅ تم تسجيل الدفعة');
-  } catch(e){ toast('خطأ في الحفظ: '+e.message,'err'); }
-  setLoading('addPayBtn', false);
 }
 
 async function exportPatExcel(pid, patName){
@@ -1038,12 +1062,10 @@ function renderUsers(){
       el.innerHTML = list.map(u=>{
         const active = u.active!==false;
 
-        // استخراج الاسم - دعم النسخ القديمة والجديدة
         const emailBase = (u.email||'').replace(DOM,'').replace('@clinic.sys','');
         const displayName = u.displayName || u.username || emailBase || '—';
         const username    = u.username    || emailBase || '—';
 
-        // دعم مفاتيح الصلاحيات القديمة (addAppointments) والجديدة (addAppt)
         const op = u.permissions || {};
         const p = {
           addAppt:    op.addAppt    ?? op.addAppointments    ?? DEFPERMS.addAppt,
@@ -1064,7 +1086,6 @@ function renderUsers(){
               <button class="btn btn-g btn-sm" onclick="deleteSec('${u.id}','${esc(displayName)}')">🗑 حذف</button>
             </div>
           </div>
-          <!-- تحديث الاسم للمستخدمين القدامى -->
           ${(!u.displayName&&!u.username)?`
           <div class="alert alert-warn" style="background:#fef9e7;border:1px solid #f9e79f;color:#7d6608;padding:8px 12px;border-radius:6px;margin-bottom:10px;font-size:.85em">
             ⚠️ هذا الحساب أُنشئ بنسخة قديمة، يمكنك تحديث اسمه:
@@ -1123,12 +1144,10 @@ async function createSec(){
 
   setLoading('createSecBtn', true);
   try{
-    // إنشاء الحساب بالتطبيق الثانوي (بدون تسجيل خروج الطبيب)
     const cred = await auth2.createUserWithEmailAndPassword(toEmail(u), p);
     const uid = cred.user.uid;
     await auth2.signOut();
 
-    // حفظ البيانات بـ Firestore (بدون قيود الـ UID)
     await db.collection('users_meta').doc(uid).set({
       username: u,
       displayName: d,
